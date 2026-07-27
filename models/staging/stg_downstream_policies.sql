@@ -1,0 +1,1 @@
+select * from {{ ref('hippo_pov','fct_policies') }}
