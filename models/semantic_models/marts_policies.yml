@@ -290,3 +290,14 @@ models:
         granularity: day
         dimension:
           type: time
+
+
+  - name: time_spine_daily
+    description: Thin local mart over the upstream `hippo_pov` daily time spine for MetricFlow time-based joins and cumulative metrics.
+    time_spine:
+      standard_granularity_column: date_day
+
+    columns:
+      - name: date_day
+        description: Base date column for daily time spine granularity.
+        granularity: day
