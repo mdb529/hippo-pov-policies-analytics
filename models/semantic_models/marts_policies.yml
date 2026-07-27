@@ -1,163 +1,292 @@
-semantic_models:
-  - name: policies
-    description: Policy fact semantic model defined directly on the upstream `hippo_pov` policy fact and scoped to policy analytics only.
-    model: ref('hippo_pov', 'fct_policies')
-    defaults:
-      agg_time_dimension: effective_date
-    entities:
-      - name: policy
-        type: primary
-        expr: policy_id
-      - name: customer
-        type: foreign
-        expr: customer_id
-      - name: property
-        type: foreign
-        expr: property_id
-      - name: agent
-        type: foreign
-        expr: agent_id
-      - name: quote
-        type: foreign
-        expr: quote_id
-    dimensions:
+models:
+  - name: fct_policies
+    description: Thin local mart over the upstream `hippo_pov` policy fact, scoped to policy analytics only.
+    semantic_model:
+      enabled: true
+      name: policies
+
+    agg_time_dimension: effective_date
+
+    columns:
+      - name: policy_id
+        description: Unique identifier for the policy.
+        entity:
+          type: primary
+          name: policy
+
+      - name: customer_id
+        description: Identifier for the policyholder customer.
+        entity:
+          type: foreign
+          name: customer
+
+      - name: property_id
+        description: Identifier for the insured property.
+        entity:
+          type: foreign
+          name: property
+
+      - name: agent_id
+        description: Identifier for the writing agent.
+        entity:
+          type: foreign
+          name: agent
+
+      - name: quote_id
+        description: Identifier for the originating quote when present.
+        entity:
+          type: foreign
+          name: quote
+
       - name: effective_date
-        type: time
-        type_params:
-          time_granularity: day
+        description: Policy effective date.
+        granularity: day
+        dimension:
+          type: time
+
       - name: expiration_date
-        type: time
-        type_params:
-          time_granularity: day
+        description: Policy expiration date.
+        granularity: day
+        dimension:
+          type: time
+
       - name: cancellation_date
-        type: time
-        type_params:
-          time_granularity: day
+        description: Policy cancellation date when applicable.
+        granularity: day
+        dimension:
+          type: time
+
       - name: state
-        type: categorical
+        description: State where the policy is written.
+        dimension:
+          type: categorical
+
       - name: coverage_type
-        type: categorical
+        description: Coverage form associated with the policy.
+        dimension:
+          type: categorical
+
       - name: policy_status
-        type: categorical
+        description: Current status of the policy.
+        dimension:
+          type: categorical
+
       - name: is_new_business
-        type: categorical
+        description: Whether the policy represents new business.
+        dimension:
+          type: categorical
+
       - name: is_active
-        type: categorical
+        description: Whether the policy is currently active.
+        dimension:
+          type: categorical
+
       - name: acquisition_channel
-        type: categorical
+        description: Channel through which the policy was acquired.
+        dimension:
+          type: categorical
+
       - name: property_type
-        type: categorical
+        description: Type of insured property associated with the policy.
+        dimension:
+          type: categorical
+
       - name: construction_type
-        type: categorical
+        description: Construction type of the insured property.
+        dimension:
+          type: categorical
+
       - name: has_smart_home_device
-        type: categorical
+        description: Whether the insured property has a smart home device.
+        dimension:
+          type: categorical
+
       - name: agent_channel
-        type: categorical
+        description: Channel classification of the agent when available on the policy fact.
+        dimension:
+          type: categorical
+
       - name: agent_region
-        type: categorical
-    measures:
+        description: Agent region when available on the policy fact.
+        dimension:
+          type: categorical
+
+    metrics:
       - name: policy_count
-        description: Count of policies.
+        description: Count of distinct policies.
+        label: Policy Count
+        type: simple
         agg: count_distinct
         expr: policy_id
-      - name: active_policy_count
-        description: Count of active policies.
-        agg: count_distinct
-        expr: case when is_active then policy_id end
-      - name: new_business_policy_count
-        description: Count of new business policies.
-        agg: count_distinct
-        expr: case when is_new_business then policy_id end
+
       - name: written_premium
         description: Total written premium across policies.
+        label: Written Premium
+        type: simple
         agg: sum
         expr: premium_amount
 
-  - name: customers
-    description: Customer dimension semantic model defined directly on the upstream `hippo_pov` customer dimension.
-    model: ref('hippo_pov', 'dim_customers')
-    entities:
-      - name: customer
-        type: primary
-        expr: customer_id
-    dimensions: []
+      - name: average_policy_premium
+        description: Average premium amount per policy.
+        label: Average Policy Premium
+        type: simple
+        agg: average
+        expr: premium_amount
 
-  - name: properties
-    description: Property dimension semantic model defined directly on the upstream `hippo_pov` property dimension.
-    model: ref('hippo_pov', 'dim_properties')
-    entities:
-      - name: property
-        type: primary
-        expr: property_id
-      - name: customer
-        type: foreign
-        expr: customer_id
-    dimensions:
+      - name: active_policy_count
+        description: Count of active policies.
+        label: Active Policy Count
+        type: simple
+        agg: count_distinct
+        expr: policy_id
+        filter: |
+          {{ Dimension('policy__is_active') }} = true
+
+      - name: inactive_policy_count
+        description: Count of inactive policies.
+        label: Inactive Policy Count
+        type: simple
+        agg: count_distinct
+        expr: policy_id
+        filter: |
+          {{ Dimension('policy__is_active') }} = false
+
+      - name: new_business_policy_count
+        description: Count of new business policies.
+        label: New Business Policy Count
+        type: simple
+        agg: count_distinct
+        expr: policy_id
+        filter: |
+          {{ Dimension('policy__is_new_business') }} = true
+
+      - name: renewal_policy_count
+        description: Count of renewal policies.
+        label: Renewal Policy Count
+        type: simple
+        agg: count_distinct
+        expr: policy_id
+        filter: |
+          {{ Dimension('policy__is_new_business') }} = false
+
+      - name: cancelled_policy_count
+        description: Count of cancelled policies.
+        label: Cancelled Policy Count
+        type: simple
+        agg: count_distinct
+        expr: policy_id
+        filter: |
+          {{ Dimension('policy__policy_status') }} = 'cancelled'
+
+  - name: dim_customers
+    description: Thin local mart over the upstream `hippo_pov` customer dimension.
+    semantic_model:
+      enabled: true
+      name: customers
+
+    columns:
+      - name: customer_id
+        description: Unique identifier for the customer.
+        entity:
+          type: primary
+          name: customer
+
+  - name: dim_properties
+    description: Thin local mart over the upstream `hippo_pov` property dimension.
+    semantic_model:
+      enabled: true
+      name: properties
+
+    columns:
+      - name: property_id
+        description: Unique identifier for the property.
+        entity:
+          type: primary
+          name: property
+
+      - name: customer_id
+        description: Identifier for the customer who owns the property.
+        entity:
+          type: foreign
+          name: customer
+
       - name: city
-        type: categorical
+        description: Property city.
+        dimension:
+          type: categorical
+
       - name: state
-        type: categorical
+        description: Property state.
+        dimension:
+          type: categorical
+
       - name: zip_code
-        type: categorical
+        description: Property ZIP code.
+        dimension:
+          type: categorical
+
       - name: property_type
-        type: categorical
+        description: Type of property.
+        dimension:
+          type: categorical
+
       - name: construction_type
-        type: categorical
+        description: Property construction type.
+        dimension:
+          type: categorical
+
       - name: year_built
-        type: categorical
+        description: Year the property was built.
+        dimension:
+          type: categorical
+
       - name: square_footage
-        type: categorical
+        description: Property square footage.
+        dimension:
+          type: categorical
+
       - name: roof_age_years
-        type: categorical
+        description: Roof age in years.
+        dimension:
+          type: categorical
+
       - name: has_smart_home_device
-        type: categorical
+        description: Whether the property has a smart home device.
+        dimension:
+          type: categorical
 
-  - name: agents
-    description: Agent dimension semantic model defined directly on the upstream `hippo_pov` agent dimension.
-    model: ref('hippo_pov', 'dim_agents')
-    entities:
-      - name: agent
-        type: primary
-        expr: agent_id
-    dimensions:
+  - name: dim_agents
+    description: Thin local mart over the upstream `hippo_pov` agent dimension.
+    semantic_model:
+      enabled: true
+      name: agents
+
+    columns:
+      - name: agent_id
+        description: Unique identifier for the agent.
+        entity:
+          type: primary
+          name: agent
+
       - name: agent_channel
-        type: categorical
-      - name: agent_region
-        type: categorical
-        expr: region
-      - name: agent_is_active
-        type: categorical
-        expr: is_active
+        description: Channel classification for the agent.
+        dimension:
+          type: categorical
+
+      - name: region
+        description: Agent region.
+        dimension:
+          type: categorical
+          name: agent_region
+
+      - name: is_active
+        description: Whether the agent is active.
+        dimension:
+          type: categorical
+          name: agent_is_active
+
       - name: hire_date
-        type: time
-        type_params:
-          time_granularity: day
-
-metrics:
-  - name: policy_count
-    description: Count of policies.
-    label: Policy Count
-    type: simple
-    type_params:
-      measure: policy_count
-
-  - name: active_policy_count
-    description: Count of active policies.
-    label: Active Policy Count
-    type: simple
-    type_params:
-      measure: active_policy_count
-
-  - name: new_business_policy_count
-    description: Count of new business policies.
-    label: New Business Policy Count
-    type: simple
-    type_params:
-      measure: new_business_policy_count
-
-  - name: written_premium
-    description: Total written premium across policies.
-    label: Written Premium
-    type: simple
-    type_params:
-      measure: written_premium
+        description: Agent hire date.
+        granularity: day
+        dimension:
+          type: time
